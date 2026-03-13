@@ -118,11 +118,11 @@ Each trader:
 
 #### Exchange Selection Logic
 
-The trader sends the order to the exchange where the selected price level already exists.
+The trader sends the order to the exchange where the selected price level does not exist. If the price level exists on both or neither exchange, the choice is random with equal probability.
 
 If no quotes exist on either exchange:
-- Buy orders are placed 5% above the last traded price
-- Sell orders are placed 5% below the last traded price
+- Buy orders are placed 5% above/below the last traded price
+- Sell orders are placed 5% above/below the last traded price
 
 #### Capital Management
 
@@ -217,8 +217,8 @@ pip install matplotlib
 
 ### 2. Ensure all files are in the same directory
 ```
-exchange.py
-oms.py
+exchange_engine.py
+oms+trader.py
 fast_trader.py
 simulation.py
 ```
