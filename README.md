@@ -1,33 +1,218 @@
 # Advance_Assignment_01
 A stock exchange simulation implementing order matching, trader behaviour and cross-exchange arbitrage over a 6.5-hour trading day.
 
----
+--
 
 ## Overview
-This project simulates a realistic stock market environment with two identical exchanges, five standard traders, and one fast trader. All components communicate through a central router that dispatches exchange notifications to the correct trader's order management system. The simulation runs in 0.5-second increments over a 6.5-hour trading day, tracking P&L for every participant in real time.
+This project simulates a realistic stock market environment consisting of:
+- Two identical exchanges
+- Five standard traders
+- One fast trader (arbitrage trader)
+- A central router that routes exchange notifications to each trader’s Order Management System (OMS)
+
+The simulation runs in 0.5-second increments across a 6.5-hour trading session (46,800 ticks).
+Throughout the simulation, Profit & Loss (P&L) is tracked in real time for every trader.
+
+## System Architecture
+
+The system consists of four main modules:
+
+├── exchange_engine.py
+├── oms+trader.py
+├── fast_trader.py
+├── simulation.py
+
+Each module represents a core component of the simulated trading system.
 
 ## File Breakdown
-exchange-engine.py
 
-Implements the core exchange infrastructure. Each exchange hosts up to five securities, each with its own independent order book. Orders are stored in heaps to maintain price-time priority —> buy orders in a max-heap (highest price first) and sell orders in a min-heap (lowest price first). When a new order arrives it is immediately matched against the opposite side of the book. If the best bid is greater than or equal to the best ask, a trade is executed at the passive order's price (the older order sets the price). After every order insertion the top-5 rule is enforced — any order outside the best 5 on either side is immediately cancelled and the trader is notified via the router. At end of day all remaining resting orders are cancelled. The exchange exposes market data methods for last traded price, best bid, best ask, and top 5 bids and offers.
+### 1. exchange_engine.py
 
-oms+trader.py
+This module implements the core exchange infrastructure.
+Each exchange supports up to five securities, each with its own independent order book.
 
-Implements the Order Management System and the standard Trader. The OMS tracks trading cash and portfolio holdings per trader and acts as the only permitted route for placing orders on the exchange. When a buy order is placed, cash is reserved immediately to prevent overspending. When a sell order is placed, shares are locked immediately to prevent overselling. When the exchange reports a fill via the router, the OMS credits shares on a buy fill and credits cash on a sell fill. The Trader class sits on top of the OMS and implements the trading logic required by the assignment — randomly choosing buy or sell with equal probability, selecting a price from best bid, best ask, or mid-price, and choosing which exchange to send the order to based on whether that price level already exists on one of the exchanges. If no quotes exist on either exchange, the trader places an order 5% above or below the last traded price. Traders automatically top up their trading account from their bank balance when cash runs low, and stop trading entirely when both cash and shares are exhausted.
+#### Order Book Design
 
-fast_trader.py
+Orders are stored using heaps to enforce price–time priority:
+- Buy orders → Max heap (highest price first)
+- Sell orders → Min heap (lowest price first)
 
-Implements the Fast Trader which operates at every half-second tick. The fast trader's strategy is pure cross-exchange arbitrage — at every x.5 second it scans all five securities across both exchanges looking for situations where the ask price on one exchange is strictly lower than the bid price on the other. When such a discrepancy is found it simultaneously places a buy order on the cheaper exchange and a sell order on the more expensive one, locking in a guaranteed risk-free profit. Before placing any order it verifies that sufficient size exists on both sides of the book and that enough cash is available. The fast trader maintains its own separate OMS account and never holds shares beyond what is needed to complete an arbitrage pair.
+#### Order Matching Logic
 
-simulation.py
+When a new order arrives:
+1. The exchange checks the opposite side of the order book
+2. If best_bid >= best_ask
+3. A trade is executed.
 
-The main entry point that wires all components together and runs the simulation. It creates two identical exchanges connected to a central router, registers five standard traders each with a random starting portfolio of 2,000 to 8,000 shares per security, and initialises one fast trader. The simulation runs for 46,800 ticks covering a 6.5-hour trading day. At every integer second the standard traders act on each security. At every half-second the fast trader scans for arbitrage. P&L is recorded periodically throughout the day by marking each trader's portfolio to mid-market prices across both exchanges. At end of day all resting orders are cancelled, final P&L is printed to console for all participants, and a two-panel graph is saved showing standard trader P&L on top and fast trader P&L below.
+The passive order (older order) determines the trade price.
+
+#### Top-5 Rule
+
+After each order insertion:
+
+- Only the top 5 bids and top 5 asks remain active
+- Any order outside the top 5 is automatically cancelled
+- The trader is notified through the router
+
+#### End-of-Day Behaviour
+
+- All remaining resting orders are cancelled.
+- Final market data is recorded.
+
+#### Market Data Methods
+
+The exchange provides:
+
+- Last traded price
+- Best bid
+- Best ask
+- Top 5 bids
+- Top 5 asks
+
+### 2. oms+trader.py
+
+This module implements both:
+
+- Order Management System (OMS)
+- Standard Trader
+
+#### Order Management System
+
+The OMS acts as the only interface between traders and exchanges.
+
+It tracks:
+
+- Trader cash balance
+- Portfolio holdings
+- Reserved capital for open orders
+
+#### Risk Controls
+
+When placing orders:
+
+Buy Order
+- Cash is reserved immediately
+- Prevents overspending
+
+Sell Order
+- Shares are locked immediately
+- Prevents overselling
+
+#### Fill Handling
+
+When a trade occurs:
+
+|Order Type| OMS Action | 
+|----------|----------|
+| Buy Fill |Shares credited| 
+| Sell Fill|Cash credited | 
+
+#### Standard Trader Strategy
+
+Each trader:
+- Randomly selects Buy or Sell (50/50 probability)
+- Chooses price from:
++ Best Bid
++ Best Ask
++ Mid-Price
+
+#### Exchange Selection Logic
+
+The trader sends the order to the exchange where the selected price level already exists.
+
+If no quotes exist on either exchange:
+- Buy orders are placed 5% above the last traded price
+- Sell orders are placed 5% below the last traded price
+
+#### Capital Management
+
+Traders automatically:
+
+- Top up their trading account from their bank balance when cash runs low
+- Stop trading when both:
++ Cash = 0
++ Shares = 0
+
+### 3. fast_trader.py
+
+This module implements the Fast Trader, which operates at every 0.5-second tick.
+
+#### Strategy: Cross-Exchange Arbitrage
+
+At each half-second interval, the fast trader scans all securities across both exchanges looking for price discrepancies:
+
+Ask_A < Bid_B
+or
+Ask_B < Bid_A
+
+When such a condition occurs:
+
+1. Buy on the cheaper exchange
+2. Sell on the more expensive exchange
+
+This locks in a risk-free arbitrage profit.
+
+#### Risk Checks Before Trading
+
+Before placing orders the fast trader verifies:
+
+- Sufficient order book depth
+- Adequate available cash
+
+The fast trader:
+
+-  Uses its own OMS account
+-  Never holds inventory longer than needed to complete the arbitrage pair
+
+### 4. simulation.py
+
+This file is the main entry point of the system.
+
+It performs the following tasks:
+
+#### System Initialization
+
+- Creates two identical exchanges
+- Connects them via a central router
+- Registers five standard traders
+- Initializes one fast trader
+
+Each standard trader starts with:
+
+- 2,000 – 8,000 shares per security (randomized)
+
+### Simulation Timeline
+
+| Event    | Frequency| 
+|----------|----------|
+| Standard Traders   | Every 1 second  | 
+| Fast Trader    | Every 0.5 second | 
+
+Total duration:
+
+46,800 ticks = 6.5 hour trading day
+
+#### P&L Tracking
+
+P&L is periodically calculated by:
+````
+Portfolio Value = Cash + Mark-to-Market value of holdings
+````
+Prices are marked using mid-market prices across both exchanges.
+
+#### End-of-Day Actions
+
+At the end of the simulation:
+
+- All remaining orders are cancelled
+- Final P&L is printed
+- A P&L graph is generated
 
 ## How to Run
 
 ### 1. Install dependencies
 ```
-bashpip install matplotlib
+pip install matplotlib
 ```
 
 ### 2. Ensure all files are in the same directory
