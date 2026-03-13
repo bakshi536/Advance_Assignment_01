@@ -40,7 +40,7 @@ simulation.py
 
 ### 3. Run the simulation
 ```
-bashpython simulation.py
+python simulation.py
 ```
 
 ### 4. Output
